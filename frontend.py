@@ -1,100 +1,79 @@
 import json
-
-def get_current_temperature(location: str, unit: str = "celsius"):
-    """Get current temperature at a location.
-
-    Args:
-        location: The location to get the temperature for, in the format "City, State, Country".
-        unit: The unit to return the temperature in. Defaults to "celsius". (choices: ["celsius", "fahrenheit"])
-
-    Returns:
-        the temperature, the location, and the unit in a dict
-    """
-    return {
-        "temperature": 26.1,
-        "location": location,
-        "unit": unit,
-    }
-
-
-def get_temperature_date(location: str, date: str, unit: str = "celsius"):
-    """Get temperature at a location and date.
-
-    Args:
-        location: The location to get the temperature for, in the format "City, State, Country".
-        date: The date to get the temperature for, in the format "Year-Month-Day".
-        unit: The unit to return the temperature in. Defaults to "celsius". (choices: ["celsius", "fahrenheit"])
-
-    Returns:
-        the temperature, the location, the date and the unit in a dict
-    """
-    return {
-        "temperature": 25.9,
-        "location": location,
-        "date": date,
-        "unit": unit,
-    }
+from models import get_image_caption, detect_objects_in_image, classify_image
 
 
 def get_function_by_name(name):
-    if name == "get_current_temperature":
-        return get_current_temperature
-    if name == "get_temperature_date":
-        return get_temperature_date
+    if name == "get_image_caption":
+        return get_image_caption
+    if name == "detect_objects_in_image":
+        return detect_objects_in_image
+    if name == "classify_image":
+        return classify_image
 
 TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "get_current_temperature",
-            "description": "Get current temperature at a location.",
+            "name": "get_image_caption",
+            "description": "Generate a caption for an image.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "location": {
+                    "image_path": {
                         "type": "string",
-                        "description": 'The location to get the temperature for, in the format "City, State, Country".',
-                    },
-                    "unit": {
-                        "type": "string",
-                        "enum": ["celsius", "fahrenheit"],
-                        "description": 'The unit to return the temperature in. Defaults to "celsius".',
+                        "description": "Path to the image file for which to generate a caption.",
                     },
                 },
-                "required": ["location"],
+                "required": ["image_path"],
             },
         },
     },
     {
         "type": "function",
         "function": {
-            "name": "get_temperature_date",
-            "description": "Get temperature at a location and date.",
+            "name": "detect_objects_in_image",
+            "description": "Detect objects in an image.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "location": {
+                    "image_path": {
                         "type": "string",
-                        "description": 'The location to get the temperature for, in the format "City, State, Country".',
+                        "description": "Path to the image file for object detection.",
                     },
-                    "date": {
+                    "threshold": {
                         "type": "string",
-                        "description": 'The date to get the temperature for, in the format "Year-Month-Day".',
-                    },
-                    "unit": {
-                        "type": "string",
-                        "enum": ["celsius", "fahrenheit"],
-                        "description": 'The unit to return the temperature in. Defaults to "celsius".',
+                        "description": "Confidence threshold for detections (e.g., '0.9').",
                     },
                 },
-                "required": ["location", "date"],
+                "required": ["image_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "classify_image",
+            "description": "Classify an image into predefined categories.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "image_path": {
+                        "type": "string",
+                        "description": "Path to the image file for classification.",
+                    },
+                    "top_k": {
+                        "type": "string",
+                        "description": "Number of top predictions to return (e.g., '5').",
+                    },
+                },
+                "required": ["image_path"],
             },
         },
     },
 ]
 MESSAGES = [
-    {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.\n\nCurrent Date: 2024-09-30"},
-    {"role": "user",  "content": "What's the temperature in San Francisco now? How about tomorrow?"},
+    {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.\n\n"},
+    {"role": "user",  "content": "Can you describe this picture(path is ./pic1.jpg) and count how many objects in the picture?"},
 ]
 
 tools = TOOLS
