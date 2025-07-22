@@ -26,37 +26,37 @@ def get_function_by_name(name):
 
 def execute_function_with_timing(func, **kwargs):
     global monitor_thread, stop_monitoring_event
-    
+
     if monitor_thread is None or not monitor_thread.is_alive():
         stop_monitoring_event = threading.Event()
         monitor_thread, stop_monitoring_event = start_continuous_monitoring(
             interval=0.1,
-            output_file='vmem_usage.txt',
+            output_file='vmem_usage.csv',
             stop_event=stop_monitoring_event
         )
-    
+
     log_gpu_memory_stats(f"{func.__name__}_Start")
-    
+
     # Execute function with timing
     start_time = time.time()
     fn_name = func.__name__
     logger.info(f"Executing tool: {fn_name} with args: {kwargs}")
-    
+
     try:
         result = func(**kwargs)
         execution_time = time.time() - start_time
         logger.info(f"Tool {fn_name} completed in {execution_time:.3f}s")
-        
+
         log_gpu_memory_stats(f"{func.__name__}_End")
-        
+
         return result
     except Exception as e:
         execution_time = time.time() - start_time
         logger.error(f"Tool {fn_name} failed after {execution_time:.3f}s with error: {str(e)}")
-        
+
         # Log GPU memory state on failure
         log_gpu_memory_stats(f"{func.__name__}_Failed")
-        
+
         raise
 
 TOOLS = [
@@ -122,7 +122,7 @@ TOOLS = [
 ]
 MESSAGES = [
     {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.\n\n"},
-    {"role": "user",  "content": "Can you describe this picture(path is ./pic1.jpg) and count how many objects in the picture?"},
+    {"role": "user",  "content": "Can you describe this picture(path is ./pic1.jpg) and count how many objects in the picture?, finish the task must use at least two tools"},
 ]
 
 tools = TOOLS
@@ -149,8 +149,8 @@ logger.info(f"Request content: {messages[-1]['content']}")
 if monitor_thread is None or not monitor_thread.is_alive():
     stop_monitoring_event = threading.Event()
     monitor_thread, stop_monitoring_event = start_continuous_monitoring(
-        interval=0.1, 
-        output_file='vmem_usage.txt',
+        interval=0.1,
+        output_file='vmem_usage.csv',
         stop_event=stop_monitoring_event
     )
 
@@ -180,19 +180,19 @@ messages.append(response.choices[0].message.model_dump())
 
 if tool_calls := messages[-1].get("tool_calls", None):
     logger.info(f"Response includes {len(tool_calls)} tool calls")
-    
+
     for tool_call in tool_calls:
         call_id: str = tool_call["id"]
         if fn_call := tool_call.get("function"):
             fn_name: str = fn_call["name"]
             fn_args: dict = json.loads(fn_call["arguments"])
-            
+
             logger.info(f"Processing tool call: {fn_name} (ID: {call_id})")
-            
+
             # Execute function with timing
             fn_result = execute_function_with_timing(get_function_by_name(fn_name), **fn_args)
             fn_res: str = json.dumps(fn_result)
-            
+
             messages.append({
                 "role": "tool",
                 "content": fn_res,
@@ -207,8 +207,8 @@ logger.info(f"Sending follow-up request with {len(messages)} messages")
 if monitor_thread is None or not monitor_thread.is_alive():
     stop_monitoring_event = threading.Event()
     monitor_thread, stop_monitoring_event = start_continuous_monitoring(
-        interval=0.1, 
-        output_file='vmem_usage.txt',
+        interval=0.1,
+        output_file='vmem_usage.csv',
         stop_event=stop_monitoring_event
     )
 
@@ -234,6 +234,9 @@ log_gpu_memory_stats("Second_LLM_Request_End")
 
 logger.info(f"Follow-up request completed in {second_request_duration:.3f}s")
 
+with open("response.txt", "w") as f:
+    f.write(str(response))
+
 messages.append(response.choices[0].message.model_dump())
 
 if "content" in response.choices[0].message and response.choices[0].message.content:
@@ -245,11 +248,9 @@ else:
 total_duration = time.time() - request_start_time
 logger.info(f"Total interaction completed in {total_duration:.3f}s")
 
-# Stop GPU memory monitoring at the end of the script
 if monitor_thread and monitor_thread.is_alive():
     stop_continuous_monitoring(monitor_thread, stop_monitoring_event)
 
-# Register cleanup function to be called on program exit
 def on_exit():
     if monitor_thread and monitor_thread.is_alive():
         stop_continuous_monitoring(monitor_thread, stop_monitoring_event)

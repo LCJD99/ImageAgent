@@ -1,4 +1,5 @@
 .venv
 
-gpu_memory_log.txt
+*.txt
 **/__pycache__/
+*.csv
