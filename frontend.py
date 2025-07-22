@@ -1,5 +1,10 @@
 import json
+import time
+from logger import setup_logger
 from models import get_image_caption, detect_objects_in_image, classify_image
+
+# Setup logger
+logger = setup_logger(log_file='frontend_log.txt')
 
 
 def get_function_by_name(name):
@@ -9,6 +14,22 @@ def get_function_by_name(name):
         return detect_objects_in_image
     if name == "classify_image":
         return classify_image
+
+def execute_function_with_timing(func, **kwargs):
+    """Execute a function and log its execution time"""
+    start_time = time.time()
+    fn_name = func.__name__
+    logger.info(f"Executing tool: {fn_name} with args: {kwargs}")
+    
+    try:
+        result = func(**kwargs)
+        execution_time = time.time() - start_time
+        logger.info(f"Tool {fn_name} completed in {execution_time:.3f}s")
+        return result
+    except Exception as e:
+        execution_time = time.time() - start_time
+        logger.error(f"Tool {fn_name} failed after {execution_time:.3f}s with error: {str(e)}")
+        raise
 
 TOOLS = [
     {
@@ -92,6 +113,11 @@ client = OpenAI(
 
 model_name = "./qwen2.5"
 
+# Log request information
+logger.info(f"Sending request with {len(messages)} messages")
+logger.info(f"Request content: {messages[-1]['content']}")
+
+request_start_time = time.time()
 response = client.chat.completions.create(
     model=model_name,
     messages=messages,
@@ -103,24 +129,37 @@ response = client.chat.completions.create(
         "repetition_penalty": 1.05,
     },
 )
+request_duration = time.time() - request_start_time
+logger.info(f"Initial request completed in {request_duration:.3f}s")
 
 messages.append(response.choices[0].message.model_dump())
 
 if tool_calls := messages[-1].get("tool_calls", None):
+    logger.info(f"Response includes {len(tool_calls)} tool calls")
+    
     for tool_call in tool_calls:
         call_id: str = tool_call["id"]
         if fn_call := tool_call.get("function"):
             fn_name: str = fn_call["name"]
             fn_args: dict = json.loads(fn_call["arguments"])
-
-            fn_res: str = json.dumps(get_function_by_name(fn_name)(**fn_args))
-
+            
+            logger.info(f"Processing tool call: {fn_name} (ID: {call_id})")
+            
+            # Execute function with timing
+            fn_result = execute_function_with_timing(get_function_by_name(fn_name), **fn_args)
+            fn_res: str = json.dumps(fn_result)
+            
             messages.append({
                 "role": "tool",
                 "content": fn_res,
                 "tool_call_id": call_id,
             })
+else:
+    logger.info("Response does not include any tool calls")
 
+logger.info(f"Sending follow-up request with {len(messages)} messages")
+
+second_request_start_time = time.time()
 response = client.chat.completions.create(
     model=model_name,
     messages=messages,
@@ -132,7 +171,16 @@ response = client.chat.completions.create(
         "repetition_penalty": 1.05,
     },
 )
+second_request_duration = time.time() - second_request_start_time
+logger.info(f"Follow-up request completed in {second_request_duration:.3f}s")
 
 messages.append(response.choices[0].message.model_dump())
 
-print(messages)
+if "content" in response.choices[0].message and response.choices[0].message.content:
+    content_preview = response.choices[0].message.content[:100] + "..." if len(response.choices[0].message.content) > 100 else response.choices[0].message.content
+    logger.info(f"Final response received: {content_preview}")
+else:
+    logger.info("Final response received with no content")
+
+total_duration = time.time() - request_start_time
+logger.info(f"Total interaction completed in {total_duration:.3f}s")

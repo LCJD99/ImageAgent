@@ -1,28 +1,20 @@
 import pynvml
 import torch
-import time
 import logging
 
-# 配置日志
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    filename='gpu_memory_log.txt',
-                    filemode='w')
-console = logging.StreamHandler()
-console.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-console.setFormatter(formatter)
-logging.getLogger('').addHandler(console)
-
-
 # 初始化 pynvml
-try:
-    pynvml.nvmlInit()
-    handle = pynvml.nvmlDeviceGetHandleByIndex(0) # 假设使用 GPU 0
-    logging.info("pynvml initialized successfully.")
-except Exception as e:
-    logging.error(f"Failed to initialize pynvml: {e}")
-    handle = None
+handle = None
+
+def init_pynvml():
+    """初始化 pynvml 库"""
+    global handle
+    try:
+        pynvml.nvmlInit()
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0) 
+        logging.info("pynvml initialized successfully.")
+    except Exception as e:
+        logging.error(f"Failed to initialize pynvml: {e}")
+        handle = None
 
 def log_gpu_memory_stats(event_description: str):
     """
@@ -37,6 +29,7 @@ def log_gpu_memory_stats(event_description: str):
     total_mem = "N/A"
     used_mem = "N/A"
     free_mem = "N/A"
+    global handle
     if handle:
         mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
         total_mem = mem_info.total / 1024**2
@@ -61,6 +54,7 @@ def log_gpu_memory_stats(event_description: str):
 
 def cleanup():
     """在程序结束时关闭pynvml"""
+    global handle
     if handle:
         pynvml.nvmlShutdown()
         logging.info("pynvml shut down.")

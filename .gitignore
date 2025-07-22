@@ -1,1 +1,4 @@
 .venv
+
+gpu_memory_log.txt
+**/__pycache__/
