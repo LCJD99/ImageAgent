@@ -178,66 +178,82 @@ logger.info(f"Initial request completed in {request_duration:.3f}s")
 
 messages.append(response.choices[0].message.model_dump())
 
-if tool_calls := messages[-1].get("tool_calls", None):
-    logger.info(f"Response includes {len(tool_calls)} tool calls")
+# Start total interaction timer
+total_start_time = time.time()
 
-    for tool_call in tool_calls:
-        call_id: str = tool_call["id"]
-        if fn_call := tool_call.get("function"):
-            fn_name: str = fn_call["name"]
-            fn_args: dict = json.loads(fn_call["arguments"])
+# Continue processing tool calls until there are no more
+tool_call_round = 1
+has_tool_calls = True
 
-            logger.info(f"Processing tool call: {fn_name} (ID: {call_id})")
+while has_tool_calls:
+    if tool_calls := messages[-1].get("tool_calls", None):
+        logger.info(f"Round {tool_call_round}: Response includes {len(tool_calls)} tool calls")
 
-            # Execute function with timing
-            fn_result = execute_function_with_timing(get_function_by_name(fn_name), **fn_args)
-            fn_res: str = json.dumps(fn_result)
+        # Process all tool calls in this response
+        for tool_call in tool_calls:
+            call_id: str = tool_call["id"]
+            if fn_call := tool_call.get("function"):
+                fn_name: str = fn_call["name"]
+                fn_args: dict = json.loads(fn_call["arguments"])
 
-            messages.append({
-                "role": "tool",
-                "content": fn_res,
-                "tool_call_id": call_id,
-            })
-else:
-    logger.info("Response does not include any tool calls")
+                logger.info(f"Processing tool call: {fn_name} (ID: {call_id})")
 
-logger.info(f"Sending follow-up request with {len(messages)} messages")
+                # Execute function with timing
+                fn_result = execute_function_with_timing(get_function_by_name(fn_name), **fn_args)
+                fn_res: str = json.dumps(fn_result)
 
-# Make sure monitoring is active for the second request
-if monitor_thread is None or not monitor_thread.is_alive():
-    stop_monitoring_event = threading.Event()
-    monitor_thread, stop_monitoring_event = start_continuous_monitoring(
-        interval=0.1,
-        output_file='vmem_usage.csv',
-        stop_event=stop_monitoring_event
-    )
+                messages.append({
+                    "role": "tool",
+                    "content": fn_res,
+                    "tool_call_id": call_id,
+                })
+        
+        # Make sure monitoring is active for the next request
+        if monitor_thread is None or not monitor_thread.is_alive():
+            stop_monitoring_event = threading.Event()
+            monitor_thread, stop_monitoring_event = start_continuous_monitoring(
+                interval=0.1,
+                output_file='vmem_usage.csv',
+                stop_event=stop_monitoring_event
+            )
 
-# Log GPU memory state before the second request
-log_gpu_memory_stats("Second_LLM_Request_Start")
+        # Log GPU memory state before the next request
+        request_label = f"LLM_Request_{tool_call_round+1}_Start"
+        log_gpu_memory_stats(request_label)
 
-second_request_start_time = time.time()
-response = client.chat.completions.create(
-    model=model_name,
-    messages=messages,
-    tools=tools,
-    temperature=0.7,
-    top_p=0.8,
-    max_tokens=512,
-    extra_body={
-        "repetition_penalty": 1.05,
-    },
-)
-second_request_duration = time.time() - second_request_start_time
+        logger.info(f"Sending follow-up request {tool_call_round+1} with {len(messages)} messages")
+        
+        request_start_time = time.time()
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            tools=tools,
+            temperature=0.7,
+            top_p=0.8,
+            max_tokens=512,
+            extra_body={
+                "repetition_penalty": 1.05,
+            },
+        )
+        request_duration = time.time() - request_start_time
 
-# Log GPU memory state after the second request
-log_gpu_memory_stats("Second_LLM_Request_End")
+        # Log GPU memory state after the request
+        request_label = f"LLM_Request_{tool_call_round+1}_End"
+        log_gpu_memory_stats(request_label)
 
-logger.info(f"Follow-up request completed in {second_request_duration:.3f}s")
+        logger.info(f"Follow-up request {tool_call_round+1} completed in {request_duration:.3f}s")
+        
+        # Add the response to messages
+        messages.append(response.choices[0].message.model_dump())
+        
+        # Increment round counter
+        tool_call_round += 1
+    else:
+        logger.info(f"No more tool calls detected after {tool_call_round} rounds")
+        has_tool_calls = False
 
 with open("response.txt", "w") as f:
     f.write(str(response))
-
-messages.append(response.choices[0].message.model_dump())
 
 if "content" in response.choices[0].message and response.choices[0].message.content:
     content_preview = response.choices[0].message.content[:100] + "..." if len(response.choices[0].message.content) > 100 else response.choices[0].message.content
@@ -245,8 +261,8 @@ if "content" in response.choices[0].message and response.choices[0].message.cont
 else:
     logger.info("Final response received with no content")
 
-total_duration = time.time() - request_start_time
-logger.info(f"Total interaction completed in {total_duration:.3f}s")
+total_duration = time.time() - total_start_time
+logger.info(f"Total interaction completed in {total_duration:.3f}s with {tool_call_round-1} rounds of tool calls")
 
 if monitor_thread and monitor_thread.is_alive():
     stop_continuous_monitoring(monitor_thread, stop_monitoring_event)
