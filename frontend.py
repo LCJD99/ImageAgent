@@ -1,10 +1,19 @@
 import json
 import time
-from logger import setup_logger
-from models import get_image_caption, detect_objects_in_image, classify_image
+import atexit
+import threading
+from logger import *
+from models import *
 
 # Setup logger
 logger = setup_logger(log_file='frontend_log.txt')
+
+# Initialize GPU monitoring
+init_pynvml()
+
+# Global variable to track monitoring state
+monitor_thread = None
+stop_monitoring_event = threading.Event()
 
 
 def get_function_by_name(name):
@@ -16,7 +25,19 @@ def get_function_by_name(name):
         return classify_image
 
 def execute_function_with_timing(func, **kwargs):
-    """Execute a function and log its execution time"""
+    global monitor_thread, stop_monitoring_event
+    
+    if monitor_thread is None or not monitor_thread.is_alive():
+        stop_monitoring_event = threading.Event()
+        monitor_thread, stop_monitoring_event = start_continuous_monitoring(
+            interval=0.1,
+            output_file='vmem_usage.txt',
+            stop_event=stop_monitoring_event
+        )
+    
+    log_gpu_memory_stats(f"{func.__name__}_Start")
+    
+    # Execute function with timing
     start_time = time.time()
     fn_name = func.__name__
     logger.info(f"Executing tool: {fn_name} with args: {kwargs}")
@@ -25,10 +46,17 @@ def execute_function_with_timing(func, **kwargs):
         result = func(**kwargs)
         execution_time = time.time() - start_time
         logger.info(f"Tool {fn_name} completed in {execution_time:.3f}s")
+        
+        log_gpu_memory_stats(f"{func.__name__}_End")
+        
         return result
     except Exception as e:
         execution_time = time.time() - start_time
         logger.error(f"Tool {fn_name} failed after {execution_time:.3f}s with error: {str(e)}")
+        
+        # Log GPU memory state on failure
+        log_gpu_memory_stats(f"{func.__name__}_Failed")
+        
         raise
 
 TOOLS = [
@@ -117,6 +145,18 @@ model_name = "./qwen2.5"
 logger.info(f"Sending request with {len(messages)} messages")
 logger.info(f"Request content: {messages[-1]['content']}")
 
+# Start GPU monitoring for the initial request if not already started
+if monitor_thread is None or not monitor_thread.is_alive():
+    stop_monitoring_event = threading.Event()
+    monitor_thread, stop_monitoring_event = start_continuous_monitoring(
+        interval=0.1, 
+        output_file='vmem_usage.txt',
+        stop_event=stop_monitoring_event
+    )
+
+# Log GPU memory state before the request
+log_gpu_memory_stats("Initial_LLM_Request_Start")
+
 request_start_time = time.time()
 response = client.chat.completions.create(
     model=model_name,
@@ -130,6 +170,10 @@ response = client.chat.completions.create(
     },
 )
 request_duration = time.time() - request_start_time
+
+# Log GPU memory state after the request
+log_gpu_memory_stats("Initial_LLM_Request_End")
+
 logger.info(f"Initial request completed in {request_duration:.3f}s")
 
 messages.append(response.choices[0].message.model_dump())
@@ -159,6 +203,18 @@ else:
 
 logger.info(f"Sending follow-up request with {len(messages)} messages")
 
+# Make sure monitoring is active for the second request
+if monitor_thread is None or not monitor_thread.is_alive():
+    stop_monitoring_event = threading.Event()
+    monitor_thread, stop_monitoring_event = start_continuous_monitoring(
+        interval=0.1, 
+        output_file='vmem_usage.txt',
+        stop_event=stop_monitoring_event
+    )
+
+# Log GPU memory state before the second request
+log_gpu_memory_stats("Second_LLM_Request_Start")
+
 second_request_start_time = time.time()
 response = client.chat.completions.create(
     model=model_name,
@@ -172,6 +228,10 @@ response = client.chat.completions.create(
     },
 )
 second_request_duration = time.time() - second_request_start_time
+
+# Log GPU memory state after the second request
+log_gpu_memory_stats("Second_LLM_Request_End")
+
 logger.info(f"Follow-up request completed in {second_request_duration:.3f}s")
 
 messages.append(response.choices[0].message.model_dump())
@@ -184,3 +244,15 @@ else:
 
 total_duration = time.time() - request_start_time
 logger.info(f"Total interaction completed in {total_duration:.3f}s")
+
+# Stop GPU memory monitoring at the end of the script
+if monitor_thread and monitor_thread.is_alive():
+    stop_continuous_monitoring(monitor_thread, stop_monitoring_event)
+
+# Register cleanup function to be called on program exit
+def on_exit():
+    if monitor_thread and monitor_thread.is_alive():
+        stop_continuous_monitoring(monitor_thread, stop_monitoring_event)
+    cleanup()
+
+atexit.register(on_exit)
