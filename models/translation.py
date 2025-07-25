@@ -2,15 +2,15 @@
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import torch
 import time
-from logger.logger import setup_logger
+import logging
+from typing import Optional
 from logger.gpu_memory import log_gpu_memory_stats
 
-# Setup logger
-logger = setup_logger(log_file='frontend_log.txt')
-
 class TranslationModel:
-    def __init__(self):
-        logger.info("Starting to load translation model weights")
+    def __init__(self, logger=None):
+        self.logger = logger or logging.getLogger(__name__)
+        
+        self.logger.info("Starting to load translation model weights")
         start_time = time.time()
         log_gpu_memory_stats("TranslationModel_LoadStart")
 
@@ -21,7 +21,7 @@ class TranslationModel:
         self.model.to(self.device)
 
         load_time = time.time() - start_time
-        logger.info(f"Translation model weights loaded in {load_time:.3f}s")
+        self.logger.info(f"Translation model weights loaded in {load_time:.3f}s")
         log_gpu_memory_stats("TranslationModel_LoadEnd")
 
     def translate(self, text: str, target_language: str = "en") -> str:
@@ -57,20 +57,21 @@ class TranslationModel:
 # Global instance
 _model_instance = None
 
-def translate_text(text: str, target_language: str = "en") -> str:
+def translate_text(text: str, target_language: str = "en", logger: Optional[logging.Logger] = None) -> str:
     """
     Translate text to the target language using the T5 model.
 
     Args:
         text: The text to translate
         target_language: Target language code (default: en)
+        logger: Logger instance to use. If None, a default logger will be used.
 
     Returns:
         The translated text
     """
     global _model_instance
     if _model_instance is None:
-        _model_instance = TranslationModel()
+        _model_instance = TranslationModel(logger=logger)
 
     translated_text = _model_instance.translate(text, target_language)
     return translated_text

@@ -4,16 +4,15 @@ from PIL import Image
 import torch
 import json
 import time
-from typing import List, Dict, Any
-from logger.logger import setup_logger
+import logging
+from typing import List, Dict, Any, Optional
 from logger.gpu_memory import log_gpu_memory_stats
 
-# Setup logger
-logger = setup_logger(log_file='frontend_log.txt')
-
 class ImageClassificationModel:
-    def __init__(self):
-        logger.info("Starting to load image classification model weights")
+    def __init__(self, logger=None):
+        self.logger = logger or logging.getLogger(__name__)
+        
+        self.logger.info("Starting to load image classification model weights")
         start_time = time.time()
         log_gpu_memory_stats("ImageClassificationModel_LoadStart")
 
@@ -24,7 +23,7 @@ class ImageClassificationModel:
         self.model.to(self.device)
 
         load_time = time.time() - start_time
-        logger.info(f"Image classification model weights loaded in {load_time:.3f}s")
+        self.logger.info(f"Image classification model weights loaded in {load_time:.3f}s")
         log_gpu_memory_stats("ImageClassificationModel_LoadEnd")
 
     def classify_image(self, image_path: str, top_k: int = 5) -> List[Dict[str, Any]]:
@@ -67,21 +66,22 @@ class ImageClassificationModel:
 _model_instance = None
 
 
-def classify_image(image_path: str, top_k: str = "5") -> str:
+def classify_image(image_path: str, top_k: str = "5", logger: Optional[logging.Logger] = None) -> str:
     """Classify an image and return top predictions as JSON.
 
     Args:
         image_path: Path to the image file
         top_k: Number of top predictions to return (as string)
+        logger: Logger instance to use. If None, a default logger will be used.
 
     Returns:
         JSON string containing classification results
     """
     global _model_instance
     if _model_instance is None:
-        _model_instance = ImageClassificationModel()
+        _model_instance = ImageClassificationModel(logger=logger)
 
-    top_k_int = int(top_k)
+    top_k_int = int(top_k) if top_k else 5
     predictions = _model_instance.classify_image(image_path, top_k_int)
 
     result = {

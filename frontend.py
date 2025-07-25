@@ -2,6 +2,7 @@ import json
 import time
 import atexit
 import threading
+from functools import partial
 from logger import *
 from models import *
 
@@ -17,14 +18,15 @@ stop_monitoring_event = threading.Event()
 
 
 def get_function_by_name(name):
+    # Create partial functions with logger parameter
     if name == "get_image_caption":
-        return get_image_caption
+        return partial(get_image_caption, logger=logger)
     if name == "detect_objects_in_image":
-        return detect_objects_in_image
+        return partial(detect_objects_in_image, logger=logger)
     if name == "classify_image":
-        return classify_image
+        return partial(classify_image, logger=logger)
     if name == "translate_text":
-        return translate_text
+        return partial(translate_text, logger=logger)
 
 def execute_function_with_timing(func, **kwargs):
     global monitor_thread, stop_monitoring_event

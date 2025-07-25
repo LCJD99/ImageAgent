@@ -4,17 +4,16 @@ import torch
 from PIL import Image
 import json
 import time
-from typing import List
-from logger.logger import setup_logger
+import logging
+from typing import List, Optional
 from logger.gpu_memory import log_gpu_memory_stats
-
-# Setup logger
-logger = setup_logger(log_file='frontend_log.txt')
 
 
 class ImageCaptioningModel:
-    def __init__(self):
-        logger.info("Starting to load image captioning model weights")
+    def __init__(self, logger=None):
+        self.logger = logger or logging.getLogger(__name__)
+        
+        self.logger.info("Starting to load image captioning model weights")
         start_time = time.time()
         log_gpu_memory_stats("ImageCaptioningModel_LoadStart")
 
@@ -26,7 +25,7 @@ class ImageCaptioningModel:
         self.model.to(self.device)
 
         load_time = time.time() - start_time
-        logger.info(f"Image captioning model weights loaded in {load_time:.3f}s")
+        self.logger.info(f"Image captioning model weights loaded in {load_time:.3f}s")
         log_gpu_memory_stats("ImageCaptioningModel_LoadEnd")
 
         self.max_length = 16
@@ -62,35 +61,37 @@ class ImageCaptioningModel:
 _model_instance = None
 
 
-def get_image_caption(image_path: str) -> str:
+def get_image_caption(image_path: str, logger: Optional[logging.Logger] = None) -> str:
     """Generate caption for a single image.
 
     Args:
         image_path: Path to the image file
+        logger: Logger instance to use. If None, a default logger will be used.
 
     Returns:
         Generated caption as a string
     """
     global _model_instance
     if _model_instance is None:
-        _model_instance = ImageCaptioningModel()
+        _model_instance = ImageCaptioningModel(logger=logger)
 
     captions = _model_instance.predict([image_path])
     return captions[0] if captions else "No caption generated"
 
 
-def get_batch_image_captions(image_paths: str) -> str:
+def get_batch_image_captions(image_paths: str, logger: Optional[logging.Logger] = None) -> str:
     """Generate captions for multiple images.
 
     Args:
         image_paths: Comma-separated list of image file paths
+        logger: Logger instance to use. If None, a default logger will be used.
 
     Returns:
         JSON string containing captions for each image
     """
     global _model_instance
     if _model_instance is None:
-        _model_instance = ImageCaptioningModel()
+        _model_instance = ImageCaptioningModel(logger=logger)
 
     paths_list = [path.strip() for path in image_paths.split(",")]
     captions = _model_instance.predict(paths_list)

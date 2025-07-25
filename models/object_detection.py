@@ -4,16 +4,15 @@ import torch
 from PIL import Image
 import json
 import time
-from typing import List, Dict, Any
-from logger.logger import setup_logger
+import logging
+from typing import List, Dict, Any, Optional
 from logger.gpu_memory import log_gpu_memory_stats
 
-# Setup logger
-logger = setup_logger(log_file='frontend_log.txt')
-
 class ObjectDetectionModel:
-    def __init__(self):
-        logger.info("Starting to load object detection model weights")
+    def __init__(self, logger=None):
+        self.logger = logger or logging.getLogger(__name__)
+        
+        self.logger.info("Starting to load object detection model weights")
         start_time = time.time()
         log_gpu_memory_stats("ObjectDetectionModel_LoadStart")
 
@@ -24,7 +23,7 @@ class ObjectDetectionModel:
         self.model.to(self.device)
 
         load_time = time.time() - start_time
-        logger.info(f"Object detection model weights loaded in {load_time:.3f}s")
+        self.logger.info(f"Object detection model weights loaded in {load_time:.3f}s")
         log_gpu_memory_stats("ObjectDetectionModel_LoadEnd")
 
     def detect_objects(self, image_path: str, threshold: float = 0.9) -> List[Dict[str, Any]]:
@@ -67,21 +66,22 @@ class ObjectDetectionModel:
 _model_instance = None
 
 
-def detect_objects_in_image(image_path: str, threshold: str = "0.9") -> str:
+def detect_objects_in_image(image_path: str, threshold: str = "0.9", logger: Optional[logging.Logger] = None) -> str:
     """Detect objects in an image and return results as JSON.
 
     Args:
         image_path: Path to the image file
         threshold: Confidence threshold for detections (as string)
+        logger: Logger instance to use. If None, a default logger will be used.
 
     Returns:
         JSON string containing detected objects
     """
     global _model_instance
     if _model_instance is None:
-        _model_instance = ObjectDetectionModel()
+        _model_instance = ObjectDetectionModel(logger=logger)
 
-    threshold_float = float(threshold)
+    threshold_float = float(threshold) if threshold else 0.9
     detections = _model_instance.detect_objects(image_path, threshold_float)
 
     result = {
