@@ -4,12 +4,10 @@ import torch
 import time
 from typing import Dict, Any
 from logger import log_gpu_memory_stats
-from models.base_model import BaseModel
 
 
-class TranslationModel(BaseModel):
-    def __init__(self, weight_mode: str = "reserve"):
-        super().__init__(weight_mode=weight_mode)
+class TranslationModel:
+    def __init__(self):
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting to load translation model weights...")
         log_gpu_memory_stats("Translation_Model_Loading_Start")
         
@@ -17,13 +15,13 @@ class TranslationModel(BaseModel):
         self.tokenizer = T5Tokenizer.from_pretrained(self.model_name)
         self.model = T5ForConditionalGeneration.from_pretrained(self.model_name)
         
-        # Register model with the base class
-        self.register_model("translation", self.model)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
         
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished loading translation model weights")
         log_gpu_memory_stats("Translation_Model_Loading_Finish")
         
-    def inference(self, text: str, source_lang: str = "en", target_lang: str = "fr") -> str:
+    def translate(self, text: str, source_lang: str = "en", target_lang: str = "fr") -> str:
         """
         Translate text from source language to target language.
         
@@ -54,22 +52,14 @@ class TranslationModel(BaseModel):
         translated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
         return translated_text
-        
-    def translate(self, text: str, source_lang: str = "en", target_lang: str = "fr") -> str:
-        """
-        Public method that calls the inference method with proper weight management.
-        """
-        return self(text, source_lang, target_lang)
 
-
-from models.weight_manager import get_global_weight_mode
 
 _model = None
 
 def get_translation_model():
     global _model
     if _model is None:
-        _model = TranslationModel(weight_mode=get_global_weight_mode())
+        _model = TranslationModel()
     return _model
 
 def translate_text(text: str, source_lang: str = "en", target_lang: str = "fr") -> Dict[str, Any]:

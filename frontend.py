@@ -5,9 +5,6 @@ import threading
 from logger import *
 from models import *
 
-# Import the weight manager
-from models.weight_manager import set_global_weight_mode
-
 # Setup logger
 logger = setup_logger(log_file='frontend_log.txt')
 
@@ -18,31 +15,6 @@ init_pynvml()
 monitor_thread = None
 stop_monitoring_event = threading.Event()
 
-# Default to reserve mode (keep models in GPU memory)
-# Can be set to "swap" to move models to CPU after use
-DEFAULT_WEIGHT_MODE = "reserve"
-set_global_weight_mode(DEFAULT_WEIGHT_MODE)
-logger.info(f"Default model weight mode set to: {DEFAULT_WEIGHT_MODE}")
-
-
-def set_model_weight_mode(mode: str):
-    """
-    Set the weight management mode for all models.
-    
-    Args:
-        mode: Either "swap" or "reserve"
-            - "swap": Move model weights to CPU after use, freeing GPU memory
-            - "reserve": Keep model weights on GPU for faster subsequent calls
-    
-    Returns:
-        bool: True if mode was successfully set
-    """
-    result = set_global_weight_mode(mode)
-    if result:
-        logger.info(f"Model weight mode set to: {mode}")
-    else:
-        logger.warning(f"Failed to set model weight mode to: {mode}")
-    return result
 
 def get_function_by_name(name):
     if name == "get_image_caption":
@@ -55,8 +27,6 @@ def get_function_by_name(name):
         return colorize_image
     if name == "translate_text":
         return translate_text
-    if name == "set_model_weight_mode":
-        return set_model_weight_mode
 
 def execute_function_with_timing(func, **kwargs):
     global monitor_thread, stop_monitoring_event
@@ -94,24 +64,6 @@ def execute_function_with_timing(func, **kwargs):
         raise
 
 TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "set_model_weight_mode",
-            "description": "Set how model weights are managed between CPU and GPU memory.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "mode": {
-                        "type": "string",
-                        "description": "Weight management mode: 'swap' (move weights to CPU after use) or 'reserve' (keep weights on GPU).",
-                        "enum": ["swap", "reserve"]
-                    },
-                },
-                "required": ["mode"],
-            },
-        },
-    },
     {
         "type": "function",
         "function": {

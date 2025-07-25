@@ -6,25 +6,23 @@ import json
 from typing import List, Dict, Any
 import time
 from logger import log_gpu_memory_stats
-from models.base_model import BaseModel
 
 
-class ImageClassificationModel(BaseModel):
-    def __init__(self, weight_mode: str = "reserve"):
-        super().__init__(weight_mode=weight_mode)
+class ImageClassificationModel:
+    def __init__(self):
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting to load image classification model weights...")
         log_gpu_memory_stats("ImageClassification_Model_Loading_Start")
         
         self.processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
         self.model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
         
-        # Register model with the base class for weight management
-        self.register_model("classification", self.model)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
         
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished loading image classification model weights")
         log_gpu_memory_stats("ImageClassification_Model_Loading_Finish")
 
-    def inference(self, image_path: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def classify_image(self, image_path: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """Classify an image and return top predictions.
         
         Args:
@@ -63,16 +61,7 @@ class ImageClassificationModel(BaseModel):
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished image classification")
         log_gpu_memory_stats("ImageClassification_Prediction_Finish")
         return predictions
-        
-    def classify_image(self, image_path: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        """
-        Public method that calls the inference method with proper weight management.
-        """
-        return self(image_path, top_k)
 
-
-# Import the centralized weight manager
-from models.weight_manager import get_global_weight_mode
 
 # Global instance
 _model_instance = None
@@ -90,7 +79,7 @@ def classify_image(image_path: str, top_k: str = "5") -> str:
     """
     global _model_instance
     if _model_instance is None:
-        _model_instance = ImageClassificationModel(weight_mode=get_global_weight_mode())
+        _model_instance = ImageClassificationModel()
     
     top_k_int = int(top_k)
     predictions = _model_instance.classify_image(image_path, top_k_int)

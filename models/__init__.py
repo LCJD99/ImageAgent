@@ -5,14 +5,11 @@ from .object_detection import detect_objects_in_image
 from .image_classification import classify_image
 from .colorization import colorize_image
 from .translation import translate_text
-from .weight_manager import set_global_weight_mode, get_global_weight_mode
 
 __all__ = [
     "get_image_caption",
     "detect_objects_in_image",
     "classify_image",
     "colorize_image",
-    "translate_text",
-    "set_global_weight_mode",
-    "get_global_weight_mode"
+    "translate_text"
 ]
