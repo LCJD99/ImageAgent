@@ -11,9 +11,11 @@ logger = setup_logger(log_file='frontend_log.txt')
 # Initialize GPU monitoring
 init_pynvml()
 
-# Global variable to track monitoring state
-monitor_thread = None
-stop_monitoring_event = threading.Event()
+# Global variables to track monitoring states
+gpu_monitor_thread = None
+gpu_stop_monitoring_event = threading.Event()
+cpu_monitor_thread = None
+cpu_stop_monitoring_event = threading.Event()
 
 
 def get_function_by_name(name):
@@ -29,17 +31,29 @@ def get_function_by_name(name):
         return translate_text
 
 def execute_function_with_timing(func, **kwargs):
-    global monitor_thread, stop_monitoring_event
+    global gpu_monitor_thread, gpu_stop_monitoring_event, cpu_monitor_thread, cpu_stop_monitoring_event
 
-    if monitor_thread is None or not monitor_thread.is_alive():
-        stop_monitoring_event = threading.Event()
-        monitor_thread, stop_monitoring_event = start_continuous_monitoring(
+    # Start GPU monitoring if not already active
+    if gpu_monitor_thread is None or not gpu_monitor_thread.is_alive():
+        gpu_stop_monitoring_event = threading.Event()
+        gpu_monitor_thread, gpu_stop_monitoring_event = gpu_start_continuous_monitoring(
             interval=0.1,
             output_file='vmem_usage.csv',
-            stop_event=stop_monitoring_event
+            stop_event=gpu_stop_monitoring_event
         )
 
+    # Start CPU monitoring if not already active
+    if cpu_monitor_thread is None or not cpu_monitor_thread.is_alive():
+        cpu_stop_monitoring_event = threading.Event()
+        cpu_monitor_thread, cpu_stop_monitoring_event = cpu_start_continuous_monitoring(
+            interval=0.1,
+            output_file='cpu_usage.csv',
+            stop_event=cpu_stop_monitoring_event
+        )
+
+    # Log resource usage at the start
     log_gpu_memory_stats(f"{func.__name__}_Start")
+    log_cpu_stats(f"{func.__name__}_Start")
 
     # Execute function with timing
     start_time = time.time()
@@ -51,15 +65,18 @@ def execute_function_with_timing(func, **kwargs):
         execution_time = time.time() - start_time
         logger.info(f"Tool {fn_name} completed in {execution_time:.3f}s")
 
+        # Log resource usage at the end
         log_gpu_memory_stats(f"{func.__name__}_End")
+        log_cpu_stats(f"{func.__name__}_End")
 
         return result
     except Exception as e:
         execution_time = time.time() - start_time
         logger.error(f"Tool {fn_name} failed after {execution_time:.3f}s with error: {str(e)}")
 
-        # Log GPU memory state on failure
+        # Log resource usage on failure
         log_gpu_memory_stats(f"{func.__name__}_Failed")
+        log_cpu_stats(f"{func.__name__}_Failed")
 
         raise
 
@@ -195,17 +212,26 @@ model_name = "./qwen2.5"
 logger.info(f"Sending request with {len(messages)} messages")
 logger.info(f"Request content: {messages[-1]['content']}")
 
-# Start GPU monitoring for the initial request if not already started
-if monitor_thread is None or not monitor_thread.is_alive():
-    stop_monitoring_event = threading.Event()
-    monitor_thread, stop_monitoring_event = start_continuous_monitoring(
+# Start resource monitoring for the initial request if not already started
+if gpu_monitor_thread is None or not gpu_monitor_thread.is_alive():
+    gpu_stop_monitoring_event = threading.Event()
+    gpu_monitor_thread, gpu_stop_monitoring_event = gpu_start_continuous_monitoring(
         interval=0.1,
         output_file='vmem_usage.csv',
-        stop_event=stop_monitoring_event
+        stop_event=gpu_stop_monitoring_event
     )
 
-# Log GPU memory state before the request
+if cpu_monitor_thread is None or not cpu_monitor_thread.is_alive():
+    cpu_stop_monitoring_event = threading.Event()
+    cpu_monitor_thread, cpu_stop_monitoring_event = cpu_start_continuous_monitoring(
+        interval=0.1,
+        output_file='cpu_usage.csv',
+        stop_event=cpu_stop_monitoring_event
+    )
+
+# Log resource usage before the request
 log_gpu_memory_stats("Initial_LLM_Request_Start")
+log_cpu_stats("Initial_LLM_Request_Start")
 
 request_start_time = time.time()
 response = client.chat.completions.create(
@@ -221,8 +247,9 @@ response = client.chat.completions.create(
 )
 request_duration = time.time() - request_start_time
 
-# Log GPU memory state after the request
+# Log resource usage after the request
 log_gpu_memory_stats("Initial_LLM_Request_End")
+log_cpu_stats("Initial_LLM_Request_End")
 
 logger.info(f"Initial request completed in {request_duration:.3f}s")
 
@@ -258,18 +285,28 @@ while has_tool_calls:
                     "tool_call_id": call_id,
                 })
 
-        # Make sure monitoring is active for the next request
-        if monitor_thread is None or not monitor_thread.is_alive():
-            stop_monitoring_event = threading.Event()
-            monitor_thread, stop_monitoring_event = start_continuous_monitoring(
+        # Make sure GPU monitoring is active for the next request
+        if gpu_monitor_thread is None or not gpu_monitor_thread.is_alive():
+            gpu_stop_monitoring_event = threading.Event()
+            gpu_monitor_thread, gpu_stop_monitoring_event = gpu_start_continuous_monitoring(
                 interval=0.1,
                 output_file='vmem_usage.csv',
-                stop_event=stop_monitoring_event
+                stop_event=gpu_stop_monitoring_event
+            )
+            
+        # Make sure CPU monitoring is active for the next request
+        if cpu_monitor_thread is None or not cpu_monitor_thread.is_alive():
+            cpu_stop_monitoring_event = threading.Event()
+            cpu_monitor_thread, cpu_stop_monitoring_event = cpu_start_continuous_monitoring(
+                interval=0.1,
+                output_file='cpu_usage.csv',
+                stop_event=cpu_stop_monitoring_event
             )
 
-        # Log GPU memory state before the next request
+        # Log resource usage before the next request
         request_label = f"LLM_Request_{tool_call_round+1}_Start"
         log_gpu_memory_stats(request_label)
+        log_cpu_stats(request_label)
 
         logger.info(f"Sending follow-up request {tool_call_round+1} with {len(messages)} messages")
 
@@ -287,9 +324,10 @@ while has_tool_calls:
         )
         request_duration = time.time() - request_start_time
 
-        # Log GPU memory state after the request
+        # Log resource usage after the request
         request_label = f"LLM_Request_{tool_call_round+1}_End"
         log_gpu_memory_stats(request_label)
+        log_cpu_stats(request_label)
 
         logger.info(f"Follow-up request {tool_call_round+1} completed in {request_duration:.3f}s")
 
@@ -314,12 +352,23 @@ else:
 total_duration = time.time() - total_start_time
 logger.info(f"Total interaction completed in {total_duration:.3f}s with {tool_call_round-1} rounds of tool calls")
 
-if monitor_thread and monitor_thread.is_alive():
-    stop_continuous_monitoring(monitor_thread, stop_monitoring_event)
+# Stop both monitoring threads
+if gpu_monitor_thread and gpu_monitor_thread.is_alive():
+    gpu_stop_continuous_monitoring(gpu_monitor_thread, gpu_stop_monitoring_event)
+    
+if cpu_monitor_thread and cpu_monitor_thread.is_alive():
+    cpu_stop_continuous_monitoring(cpu_monitor_thread, cpu_stop_monitoring_event)
 
 def on_exit():
-    if monitor_thread and monitor_thread.is_alive():
-        stop_continuous_monitoring(monitor_thread, stop_monitoring_event)
+    # Cleanup GPU monitoring
+    if gpu_monitor_thread and gpu_monitor_thread.is_alive():
+        gpu_stop_continuous_monitoring(gpu_monitor_thread, gpu_stop_monitoring_event)
+    
+    # Cleanup CPU monitoring
+    if cpu_monitor_thread and cpu_monitor_thread.is_alive():
+        cpu_stop_continuous_monitoring(cpu_monitor_thread, cpu_stop_monitoring_event)
+    
+    # Cleanup GPU resources
     cleanup()
 
 atexit.register(on_exit)
