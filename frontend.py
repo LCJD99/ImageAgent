@@ -47,7 +47,7 @@ def execute_function_with_timing(func, **kwargs):
         cpu_stop_monitoring_event = threading.Event()
         cpu_monitor_thread, cpu_stop_monitoring_event = cpu_start_continuous_monitoring(
             interval=0.1,
-            output_file='cpu_usage.csv',
+            output_file='process_usage.csv',
             stop_event=cpu_stop_monitoring_event
         )
 
@@ -225,7 +225,7 @@ if cpu_monitor_thread is None or not cpu_monitor_thread.is_alive():
     cpu_stop_monitoring_event = threading.Event()
     cpu_monitor_thread, cpu_stop_monitoring_event = cpu_start_continuous_monitoring(
         interval=0.1,
-        output_file='cpu_usage.csv',
+        output_file='process_usage.csv',
         stop_event=cpu_stop_monitoring_event
     )
 
