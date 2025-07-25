@@ -7,7 +7,6 @@ def setup_logger(log_file='gpu_memory_log.txt', log_level=logging.INFO):
     :param log_file: 日志文件路径
     :param log_level: 日志级别
     """
-    print("begin setup_logger")
     logging.basicConfig(
         level=log_level,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -15,10 +14,10 @@ def setup_logger(log_file='gpu_memory_log.txt', log_level=logging.INFO):
         filemode='w'
     )
 
-    console = logging.StreamHandler(sys.stdout)
-    console.setLevel(log_level)
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
+    # console = logging.StreamHandler(sys.stdout)
+    # console.setLevel(log_level)
+    # formatter = logging.Formatter('%(asctime)s - %(message)s')
+    # console.setFormatter(formatter)
+    # logging.getLogger('').addHandler(console)
 
     return logging.getLogger('')
