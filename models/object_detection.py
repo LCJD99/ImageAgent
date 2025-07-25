@@ -3,16 +3,30 @@ from transformers import DetrImageProcessor, DetrForObjectDetection
 import torch
 from PIL import Image
 import json
+import time
 from typing import List, Dict, Any
+from logger.logger import setup_logger
+from logger.gpu_memory import log_gpu_memory_stats
+
+# Setup logger
+logger = setup_logger(log_file='object_detection_model_log.txt')
 
 
 class ObjectDetectionModel:
     def __init__(self):
+        logger.info("Starting to load object detection model weights")
+        start_time = time.time()
+        log_gpu_memory_stats("ObjectDetectionModel_LoadStart")
+        
         self.processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-101", revision="no_timm")
         self.model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-101", revision="no_timm")
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
+        
+        load_time = time.time() - start_time
+        logger.info(f"Object detection model weights loaded in {load_time:.3f}s")
+        log_gpu_memory_stats("ObjectDetectionModel_LoadEnd")
 
     def detect_objects(self, image_path: str, threshold: float = 0.9) -> List[Dict[str, Any]]:
         """Detect objects in an image.

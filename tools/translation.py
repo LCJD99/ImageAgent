@@ -12,4 +12,3 @@ decoder_input_ids = tokenizer("Studies show that", return_tensors="pt").input_id
 outputs = model(input_ids=input_ids, decoder_input_ids=decoder_input_ids)
 
 last_hidden_states = outputs.last_hidden_state
-print(outputs)

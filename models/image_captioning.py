@@ -3,17 +3,31 @@ from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoToken
 import torch
 from PIL import Image
 import json
+import time
 from typing import List
+from logger.logger import setup_logger
+from logger.gpu_memory import log_gpu_memory_stats
+
+# Setup logger
+logger = setup_logger(log_file='image_captioning_model_log.txt')
 
 
 class ImageCaptioningModel:
     def __init__(self):
+        logger.info("Starting to load image captioning model weights")
+        start_time = time.time()
+        log_gpu_memory_stats("ImageCaptioningModel_LoadStart")
+        
         self.model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         self.feature_extractor = ViTImageProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         self.tokenizer = AutoTokenizer.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
+        
+        load_time = time.time() - start_time
+        logger.info(f"Image captioning model weights loaded in {load_time:.3f}s")
+        log_gpu_memory_stats("ImageCaptioningModel_LoadEnd")
         
         self.max_length = 16
         self.num_beams = 1

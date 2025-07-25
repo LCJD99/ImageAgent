@@ -3,16 +3,30 @@ from transformers import ViTImageProcessor, ViTForImageClassification
 from PIL import Image
 import torch
 import json
+import time
 from typing import List, Dict, Any
+from logger.logger import setup_logger
+from logger.gpu_memory import log_gpu_memory_stats
+
+# Setup logger
+logger = setup_logger(log_file='image_classification_model_log.txt')
 
 
 class ImageClassificationModel:
     def __init__(self):
+        logger.info("Starting to load image classification model weights")
+        start_time = time.time()
+        log_gpu_memory_stats("ImageClassificationModel_LoadStart")
+        
         self.processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
         self.model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
+        
+        load_time = time.time() - start_time
+        logger.info(f"Image classification model weights loaded in {load_time:.3f}s")
+        log_gpu_memory_stats("ImageClassificationModel_LoadEnd")
 
     def classify_image(self, image_path: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """Classify an image and return top predictions.

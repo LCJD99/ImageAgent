@@ -23,6 +23,8 @@ def get_function_by_name(name):
         return detect_objects_in_image
     if name == "classify_image":
         return classify_image
+    if name == "translate_text":
+        return translate_text
 
 def execute_function_with_timing(func, **kwargs):
     global monitor_thread, stop_monitoring_event
@@ -116,6 +118,27 @@ TOOLS = [
                     },
                 },
                 "required": ["image_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "translate_text",
+            "description": "Translate text to a target language.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "The text to translate.",
+                    },
+                    "target_language": {
+                        "type": "string",
+                        "description": "Target language code (e.g., 'en', 'fr', 'es', 'de').",
+                    },
+                },
+                "required": ["text"],
             },
         },
     },
