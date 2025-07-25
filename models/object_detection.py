@@ -60,7 +60,33 @@ class ObjectDetectionModel:
         
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished object detection")
         log_gpu_memory_stats("ObjectDetection_Prediction_Finish")
+        
+        # Swap model weights to CPU and clear GPU memory
+        self._swap_to_cpu_and_clear_gpu()
+        
         return detections
+        
+    def _swap_to_cpu_and_clear_gpu(self):
+        """Swap model weights to CPU and clear GPU memory"""
+        if self.device.type != "cuda":
+            print("Model is already on CPU, no need to swap")
+            return
+            
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting to swap model weights to CPU")
+        swap_start_time = time.time()
+        log_gpu_memory_stats("ObjectDetection_Swap_To_CPU_Start")
+        
+        # Move model to CPU
+        self.model.to("cpu")
+        
+        # Clear CUDA cache
+        torch.cuda.empty_cache()
+        
+        swap_end_time = time.time()
+        swap_duration = swap_end_time - swap_start_time
+        
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished swapping model weights to CPU (took {swap_duration:.3f}s)")
+        log_gpu_memory_stats("ObjectDetection_Swap_To_CPU_Finish")
 
 
 # Global instance

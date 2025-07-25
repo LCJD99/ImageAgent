@@ -33,6 +33,9 @@ class TranslationModel:
         Returns:
             Translated text
         """
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting translation from {source_lang} to {target_lang}")
+        log_gpu_memory_stats("Translation_Prediction_Start")
+        
         # Format input for T5
         task_prefix = f"translate {source_lang} to {target_lang}: "
         input_text = task_prefix + text
@@ -51,7 +54,35 @@ class TranslationModel:
         # Decode the generated output
         translated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished translation")
+        log_gpu_memory_stats("Translation_Prediction_Finish")
+        
+        # Swap model weights to CPU and clear GPU memory
+        self._swap_to_cpu_and_clear_gpu()
+        
         return translated_text
+        
+    def _swap_to_cpu_and_clear_gpu(self):
+        """Swap model weights to CPU and clear GPU memory"""
+        if self.device.type != "cuda":
+            print("Model is already on CPU, no need to swap")
+            return
+            
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting to swap model weights to CPU")
+        swap_start_time = time.time()
+        log_gpu_memory_stats("Translation_Swap_To_CPU_Start")
+        
+        # Move model to CPU
+        self.model.to("cpu")
+        
+        # Clear CUDA cache
+        torch.cuda.empty_cache()
+        
+        swap_end_time = time.time()
+        swap_duration = swap_end_time - swap_start_time
+        
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished swapping model weights to CPU (took {swap_duration:.3f}s)")
+        log_gpu_memory_stats("Translation_Swap_To_CPU_Finish")
 
 
 _model = None
