@@ -9,7 +9,7 @@ from models import *
 logger = setup_logger(log_file='frontend_log.txt')
 
 # Initialize GPU monitoring
-init_pynvml()
+# init_pynvml()
 
 # Global variable to track monitoring state
 monitor_thread = None
@@ -165,10 +165,10 @@ client = OpenAI(
 model_name = "./qwen2.5"
 
 # Log request information
-logger.info(f"Sending request with {len(messages)} messages")
 logger.info(f"Request content: {messages[-1]['content']}")
 
 # Start GPU monitoring for the initial request if not already started
+"""
 if monitor_thread is None or not monitor_thread.is_alive():
     stop_monitoring_event = threading.Event()
     monitor_thread, stop_monitoring_event = start_continuous_monitoring(
@@ -177,8 +177,9 @@ if monitor_thread is None or not monitor_thread.is_alive():
         stop_event=stop_monitoring_event
     )
 
+"""
 # Log GPU memory state before the request
-log_gpu_memory_stats("Initial_LLM_Request_Start")
+logger.info("Initial request start")
 
 request_start_time = time.time()
 response = client.chat.completions.create(
@@ -193,9 +194,6 @@ response = client.chat.completions.create(
     },
 )
 request_duration = time.time() - request_start_time
-
-# Log GPU memory state after the request
-log_gpu_memory_stats("Initial_LLM_Request_End")
 
 logger.info(f"Initial request completed in {request_duration:.3f}s")
 
@@ -223,6 +221,8 @@ while has_tool_calls:
 
                 # Execute function with timing
                 fn_result = execute_function_with_timing(get_function_by_name(fn_name), **fn_args)
+
+                logger.info(f"Finished tool call: {fn_name} (ID: {call_id})")
                 fn_res: str = json.dumps(fn_result)
 
                 messages.append({
@@ -232,6 +232,7 @@ while has_tool_calls:
                 })
 
         # Make sure monitoring is active for the next request
+        """
         if monitor_thread is None or not monitor_thread.is_alive():
             stop_monitoring_event = threading.Event()
             monitor_thread, stop_monitoring_event = start_continuous_monitoring(
@@ -240,9 +241,10 @@ while has_tool_calls:
                 stop_event=stop_monitoring_event
             )
 
+        """
+
         # Log GPU memory state before the next request
         request_label = f"LLM_Request_{tool_call_round+1}_Start"
-        log_gpu_memory_stats(request_label)
 
         logger.info(f"Sending follow-up request {tool_call_round+1} with {len(messages)} messages")
 
@@ -262,7 +264,6 @@ while has_tool_calls:
 
         # Log GPU memory state after the request
         request_label = f"LLM_Request_{tool_call_round+1}_End"
-        log_gpu_memory_stats(request_label)
 
         logger.info(f"Follow-up request {tool_call_round+1} completed in {request_duration:.3f}s")
 

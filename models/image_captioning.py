@@ -9,7 +9,7 @@ from logger.logger import setup_logger
 from logger.gpu_memory import log_gpu_memory_stats
 
 # Setup logger
-logger = setup_logger(log_file='image_captioning_model_log.txt')
+logger = setup_logger(log_file='frontend_log.txt')
 
 
 class ImageCaptioningModel:
@@ -17,28 +17,28 @@ class ImageCaptioningModel:
         logger.info("Starting to load image captioning model weights")
         start_time = time.time()
         log_gpu_memory_stats("ImageCaptioningModel_LoadStart")
-        
+
         self.model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         self.feature_extractor = ViTImageProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         self.tokenizer = AutoTokenizer.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-        
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
-        
+
         load_time = time.time() - start_time
         logger.info(f"Image captioning model weights loaded in {load_time:.3f}s")
         log_gpu_memory_stats("ImageCaptioningModel_LoadEnd")
-        
+
         self.max_length = 16
         self.num_beams = 1
         self.gen_kwargs = {"max_length": self.max_length, "num_beams": self.num_beams}
 
     def predict(self, image_paths: List[str]) -> List[str]:
         """Generate captions for given images.
-        
+
         Args:
             image_paths: List of image file paths
-            
+
         Returns:
             List of generated captions
         """
@@ -64,39 +64,39 @@ _model_instance = None
 
 def get_image_caption(image_path: str) -> str:
     """Generate caption for a single image.
-    
+
     Args:
         image_path: Path to the image file
-        
+
     Returns:
         Generated caption as a string
     """
     global _model_instance
     if _model_instance is None:
         _model_instance = ImageCaptioningModel()
-    
+
     captions = _model_instance.predict([image_path])
     return captions[0] if captions else "No caption generated"
 
 
 def get_batch_image_captions(image_paths: str) -> str:
     """Generate captions for multiple images.
-    
+
     Args:
         image_paths: Comma-separated list of image file paths
-        
+
     Returns:
         JSON string containing captions for each image
     """
     global _model_instance
     if _model_instance is None:
         _model_instance = ImageCaptioningModel()
-    
+
     paths_list = [path.strip() for path in image_paths.split(",")]
     captions = _model_instance.predict(paths_list)
-    
+
     result = {}
     for path, caption in zip(paths_list, captions):
         result[path] = caption
-    
+
     return json.dumps(result)
