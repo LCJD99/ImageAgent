@@ -23,6 +23,8 @@ def get_function_by_name(name):
         return detect_objects_in_image
     if name == "classify_image":
         return classify_image
+    if name == "colorize_image":
+        return colorize_image
 
 def execute_function_with_timing(func, **kwargs):
     global monitor_thread, stop_monitoring_event
@@ -113,6 +115,27 @@ TOOLS = [
                     "top_k": {
                         "type": "string",
                         "description": "Number of top predictions to return (e.g., '5').",
+                    },
+                },
+                "required": ["image_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "colorize_image",
+            "description": "Colorize a grayscale image or enhance colors in a colored image.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "image_path": {
+                        "type": "string",
+                        "description": "Path to the image file to colorize.",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Optional path where to save the colorized image. If not provided, a default path will be used.",
                     },
                 },
                 "required": ["image_path"],
