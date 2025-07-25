@@ -207,7 +207,7 @@ while has_tool_calls:
                     "content": fn_res,
                     "tool_call_id": call_id,
                 })
-        
+
         # Make sure monitoring is active for the next request
         if monitor_thread is None or not monitor_thread.is_alive():
             stop_monitoring_event = threading.Event()
@@ -222,7 +222,7 @@ while has_tool_calls:
         log_gpu_memory_stats(request_label)
 
         logger.info(f"Sending follow-up request {tool_call_round+1} with {len(messages)} messages")
-        
+
         request_start_time = time.time()
         response = client.chat.completions.create(
             model=model_name,
@@ -242,10 +242,10 @@ while has_tool_calls:
         log_gpu_memory_stats(request_label)
 
         logger.info(f"Follow-up request {tool_call_round+1} completed in {request_duration:.3f}s")
-        
+
         # Add the response to messages
         messages.append(response.choices[0].message.model_dump())
-        
+
         # Increment round counter
         tool_call_round += 1
     else:
@@ -253,7 +253,7 @@ while has_tool_calls:
         has_tool_calls = False
 
 with open("response.txt", "w") as f:
-    f.write(str(response))
+    f.write(json.dumps(messages, indent=2))
 
 if "content" in response.choices[0].message and response.choices[0].message.content:
     content_preview = response.choices[0].message.content[:100] + "..." if len(response.choices[0].message.content) > 100 else response.choices[0].message.content
