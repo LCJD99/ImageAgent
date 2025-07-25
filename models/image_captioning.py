@@ -4,10 +4,15 @@ import torch
 from PIL import Image
 import json
 from typing import List
+import time
+from logger import log_gpu_memory_stats
 
 
 class ImageCaptioningModel:
     def __init__(self):
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting to load image captioning model weights...")
+        log_gpu_memory_stats("ImageCaptioning_Model_Loading_Start")
+        
         self.model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         self.feature_extractor = ViTImageProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         self.tokenizer = AutoTokenizer.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
@@ -18,6 +23,9 @@ class ImageCaptioningModel:
         self.max_length = 16
         self.num_beams = 1
         self.gen_kwargs = {"max_length": self.max_length, "num_beams": self.num_beams}
+        
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished loading image captioning model weights")
+        log_gpu_memory_stats("ImageCaptioning_Model_Loading_Finish")
 
     def predict(self, image_paths: List[str]) -> List[str]:
         """Generate captions for given images.
@@ -28,6 +36,9 @@ class ImageCaptioningModel:
         Returns:
             List of generated captions
         """
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting image captioning prediction for {len(image_paths)} images")
+        log_gpu_memory_stats("ImageCaptioning_Prediction_Start")
+        
         images = []
         for image_path in image_paths:
             i_image = Image.open(image_path)
@@ -41,6 +52,9 @@ class ImageCaptioningModel:
         output_ids = self.model.generate(pixel_values, **self.gen_kwargs)
         preds = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)
         preds = [pred.strip() for pred in preds]
+        
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished image captioning prediction")
+        log_gpu_memory_stats("ImageCaptioning_Prediction_Finish")
         return preds
 
 

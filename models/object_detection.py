@@ -4,15 +4,23 @@ import torch
 from PIL import Image
 import json
 from typing import List, Dict, Any
+import time
+from logger import log_gpu_memory_stats
 
 
 class ObjectDetectionModel:
     def __init__(self):
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting to load object detection model weights...")
+        log_gpu_memory_stats("ObjectDetection_Model_Loading_Start")
+        
         self.processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-101", revision="no_timm")
         self.model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-101", revision="no_timm")
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
+        
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished loading object detection model weights")
+        log_gpu_memory_stats("ObjectDetection_Model_Loading_Finish")
 
     def detect_objects(self, image_path: str, threshold: float = 0.9) -> List[Dict[str, Any]]:
         """Detect objects in an image.
@@ -24,6 +32,9 @@ class ObjectDetectionModel:
         Returns:
             List of detected objects with their information
         """
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting object detection for {image_path}")
+        log_gpu_memory_stats("ObjectDetection_Prediction_Start")
+        
         image = Image.open(image_path)
         
         inputs = self.processor(images=image, return_tensors="pt")
@@ -47,6 +58,8 @@ class ObjectDetectionModel:
             }
             detections.append(detection)
         
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished object detection")
+        log_gpu_memory_stats("ObjectDetection_Prediction_Finish")
         return detections
 
 

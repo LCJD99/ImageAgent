@@ -6,13 +6,21 @@ import numpy as np
 import io
 import base64
 import os
+import time
+from logger import log_gpu_memory_stats
 
 
 class ColorizationModel:
     def __init__(self):
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting to load colorization model weights...")
+        log_gpu_memory_stats("Colorization_Model_Loading_Start")
+        
         self.model = AutoModel.from_pretrained("sebastiansarasti/AutoEncoderImageColorization")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
+        
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished loading colorization model weights")
+        log_gpu_memory_stats("Colorization_Model_Loading_Finish")
 
     def predict(self, image_path: str, output_path: str = None) -> str:
         """Colorize a grayscale image.
@@ -24,6 +32,9 @@ class ColorizationModel:
         Returns:
             Path to the colorized image or base64 encoded image if output_path is None
         """
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting colorization prediction for {image_path}")
+        log_gpu_memory_stats("Colorization_Prediction_Start")
+        
         # Open and process the image
         img = Image.open(image_path)
         
@@ -54,13 +65,17 @@ class ColorizationModel:
             # Ensure the directory exists
             os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
             output_image.save(output_path)
-            return output_path
+            result = output_path
         else:
             # Return base64 encoded image
             buffer = io.BytesIO()
             output_image.save(buffer, format="JPEG")
             encoded_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            return encoded_image
+            result = encoded_image
+        
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished colorization prediction")
+        log_gpu_memory_stats("Colorization_Prediction_Finish")
+        return result
 
 
 # Global instance

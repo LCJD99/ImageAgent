@@ -4,15 +4,23 @@ from PIL import Image
 import torch
 import json
 from typing import List, Dict, Any
+import time
+from logger import log_gpu_memory_stats
 
 
 class ImageClassificationModel:
     def __init__(self):
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting to load image classification model weights...")
+        log_gpu_memory_stats("ImageClassification_Model_Loading_Start")
+        
         self.processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
         self.model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
+        
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished loading image classification model weights")
+        log_gpu_memory_stats("ImageClassification_Model_Loading_Finish")
 
     def classify_image(self, image_path: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """Classify an image and return top predictions.
@@ -24,6 +32,9 @@ class ImageClassificationModel:
         Returns:
             List of top predictions with their probabilities
         """
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Starting image classification for {image_path}")
+        log_gpu_memory_stats("ImageClassification_Prediction_Start")
+        
         image = Image.open(image_path)
         
         inputs = self.processor(images=image, return_tensors="pt")
@@ -47,6 +58,8 @@ class ImageClassificationModel:
             }
             predictions.append(prediction)
         
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished image classification")
+        log_gpu_memory_stats("ImageClassification_Prediction_Finish")
         return predictions
 
 
