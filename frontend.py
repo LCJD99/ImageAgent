@@ -25,6 +25,8 @@ def get_function_by_name(name):
         return classify_image
     if name == "colorize_image":
         return colorize_image
+    if name == "translate_text":
+        return translate_text
 
 def execute_function_with_timing(func, **kwargs):
     global monitor_thread, stop_monitoring_event
@@ -139,6 +141,31 @@ TOOLS = [
                     },
                 },
                 "required": ["image_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "translate_text",
+            "description": "Translate text from one language to another.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "The text to be translated.",
+                    },
+                    "source_lang": {
+                        "type": "string",
+                        "description": "The source language code (e.g., 'en' for English, 'fr' for French).",
+                    },
+                    "target_lang": {
+                        "type": "string",
+                        "description": "The target language code (e.g., 'en' for English, 'fr' for French).",
+                    },
+                },
+                "required": ["text"],
             },
         },
     },
