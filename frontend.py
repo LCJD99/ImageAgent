@@ -4,6 +4,7 @@ import atexit
 import threading
 from logger import *
 from models import *
+import random
 
 # Setup logger
 logger = setup_logger(log_file='frontend_log.txt')
@@ -31,26 +32,6 @@ def get_function_by_name(name):
         return translate_text
 
 def execute_function_with_timing(func, **kwargs):
-    global gpu_monitor_thread, gpu_stop_monitoring_event, cpu_monitor_thread, cpu_stop_monitoring_event
-
-    # Start GPU monitoring if not already active
-    if gpu_monitor_thread is None or not gpu_monitor_thread.is_alive():
-        gpu_stop_monitoring_event = threading.Event()
-        gpu_monitor_thread, gpu_stop_monitoring_event = gpu_start_continuous_monitoring(
-            interval=0.1,
-            output_file='vmem_usage.csv',
-            stop_event=gpu_stop_monitoring_event
-        )
-
-    # Start CPU monitoring if not already active
-    if cpu_monitor_thread is None or not cpu_monitor_thread.is_alive():
-        cpu_stop_monitoring_event = threading.Event()
-        cpu_monitor_thread, cpu_stop_monitoring_event = cpu_start_continuous_monitoring(
-            interval=0.1,
-            output_file='process_usage.csv',
-            stop_event=cpu_stop_monitoring_event
-        )
-
     # Log resource usage at the start
     log_gpu_memory_stats(f"{func.__name__}_Start")
     log_cpu_stats(f"{func.__name__}_Start")
@@ -188,8 +169,8 @@ TOOLS = [
     },
 ]
 MESSAGES = [
-    {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.\n\n"},
-    {"role": "user",  "content": "Can you describe this picture(path is ./pic1.jpg) and count how many objects in the picture?, finish the task must use at least two tools"},
+    {"role": "system", "content": f"{random.randint(1, 10000)}-You are Qwen bot, created by Alibaba Cloud. You are a helpful assistant.\n\n"},
+    {"role": "user",  "content": "Can you colorize this picture(path is ./pic1.jpg) and use new picture tell me what is in the picture(use object detect and image caption), tell me in Chinese(use translate_text tool)?, finish the task must use at least four tools"},
 ]
 
 tools = TOOLS
@@ -293,7 +274,7 @@ while has_tool_calls:
                 output_file='vmem_usage.csv',
                 stop_event=gpu_stop_monitoring_event
             )
-            
+
         # Make sure CPU monitoring is active for the next request
         if cpu_monitor_thread is None or not cpu_monitor_thread.is_alive():
             cpu_stop_monitoring_event = threading.Event()
@@ -355,7 +336,7 @@ logger.info(f"Total interaction completed in {total_duration:.3f}s with {tool_ca
 # Stop both monitoring threads
 if gpu_monitor_thread and gpu_monitor_thread.is_alive():
     gpu_stop_continuous_monitoring(gpu_monitor_thread, gpu_stop_monitoring_event)
-    
+
 if cpu_monitor_thread and cpu_monitor_thread.is_alive():
     cpu_stop_continuous_monitoring(cpu_monitor_thread, cpu_stop_monitoring_event)
 
@@ -363,11 +344,11 @@ def on_exit():
     # Cleanup GPU monitoring
     if gpu_monitor_thread and gpu_monitor_thread.is_alive():
         gpu_stop_continuous_monitoring(gpu_monitor_thread, gpu_stop_monitoring_event)
-    
+
     # Cleanup CPU monitoring
     if cpu_monitor_thread and cpu_monitor_thread.is_alive():
         cpu_stop_continuous_monitoring(cpu_monitor_thread, cpu_stop_monitoring_event)
-    
+
     # Cleanup GPU resources
     cleanup()
 
