@@ -2,6 +2,7 @@
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import torch
 import time
+import os
 from typing import Dict, Any
 from logger import log_gpu_memory_stats
 
@@ -57,8 +58,9 @@ class TranslationModel:
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished translation")
         log_gpu_memory_stats("Translation_Prediction_Finish")
 
-        # Swap model weights to CPU and clear GPU memory
-        self._swap_to_cpu_and_clear_gpu()
+        # Swap model weights to CPU and clear GPU memory if FRONTEND_SWAP is enabled
+        if os.getenv('FRONTEND_SWAP', 'false').lower() == 'true':
+            self._swap_to_cpu_and_clear_gpu()
 
         return translated_text
 

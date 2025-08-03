@@ -3,6 +3,7 @@ from transformers import DetrImageProcessor, DetrForObjectDetection
 import torch
 from PIL import Image
 import json
+import os
 from typing import List, Dict, Any
 import time
 from logger import log_gpu_memory_stats
@@ -61,8 +62,9 @@ class ObjectDetectionModel:
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] Finished object detection")
         log_gpu_memory_stats("ObjectDetection_Prediction_Finish")
         
-        # Swap model weights to CPU and clear GPU memory
-        self._swap_to_cpu_and_clear_gpu()
+        # Swap model weights to CPU and clear GPU memory if FRONTEND_SWAP is enabled
+        if os.getenv('FRONTEND_SWAP', 'false').lower() == 'true':
+            self._swap_to_cpu_and_clear_gpu()
         
         return detections
         
